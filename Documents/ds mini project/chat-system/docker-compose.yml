@@ -1,0 +1,65 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: chat
+      POSTGRES_DB: chatdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  load-balancer:
+    build: ./load-balancer
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - PORT=4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - redis
+      - frontend
+
+  backend1:
+    build: ./backend
+    environment:
+      - PORT=4001
+      - SERVER_ID=server-1
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://chat:password@postgres:5432/chatdb
+      - JWT_SECRET=devsecret
+    ports:
+      - "4001:4001"
+    depends_on:
+      - redis
+      - postgres
+
+  backend2:
+    build: ./backend
+    environment:
+      - PORT=4002
+      - SERVER_ID=server-2
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://chat:password@postgres:5432/chatdb
+      - JWT_SECRET=devsecret
+    ports:
+      - "4002:4002"
+    depends_on:
+      - redis
+      - postgres
+
+  frontend:
+    build: ./frontend
+    environment:
+      - VITE_LB_URL=http://load-balancer:4000
+
+volumes:
+  pgdata:
